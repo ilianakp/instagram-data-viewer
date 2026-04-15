@@ -20,10 +20,15 @@ Or visit the live site: https://ilianakp.github.io/instagram-data-viewer/
 
 ## Getting your Instagram data
 
-1. Instagram Settings > Your Activity > Download Your Information
-2. Select **HTML** format
-3. Download and unzip the archive
-4. Point this tool at the unzipped folder
+1. In Instagram, tap the **hamburger icon** (bottom-left) then **Settings**
+2. Click **Accounts Centre** > **Your information and permissions**
+3. Click **Export your information** > **Create export**
+4. Select the profile you want to export and click **Next**
+5. Select **Export to device**
+6. Customise: choose the info, date range, set **Format: HTML**, media quality, notification email
+7. Click **Start export**
+8. When Instagram emails you the file, download and unzip it
+9. Point this tool at the unzipped folder
 
 ## Browser requirement
 
