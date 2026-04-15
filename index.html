@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>instagram-surveillance-report</title>
+<script src="chartjs.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    background: #ffffff;
+    color: #000000;
+    font-family: 'SF Mono', 'Consolas', 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── TERMINAL ── */
+  .terminal {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    min-height: 100vh;
+  }
+  .term-line { white-space: pre-wrap; word-break: break-word; }
+  .term-line.dim { color: #888; }
+  .term-line.bold { font-weight: 600; }
+  .term-line.err { color: #000; border-left: 2px solid #000; padding-left: 12px; margin: 8px 0; }
+  .prompt::before { content: "$ "; color: #000; }
+  .caret::after {
+    content: "▊";
+    display: inline-block;
+    margin-left: 4px;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  button.term-btn {
+    background: #000;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: 0.9em;
+    cursor: pointer;
+    margin: 12px 0;
+    letter-spacing: 0.05em;
+  }
+  button.term-btn:hover { background: #333; }
+  button.term-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+  .box {
+    border: 1px solid #000;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .box.warn { border-color: #000; background: #f5f5f5; }
+
+  a { color: #000; text-decoration: underline; }
+
+  /* ── REPORT ── */
+  #report { display: none; }
+  #report.visible { display: block; }
+  .container { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  .hero { padding: 120px 24px 80px; border-bottom: 1px solid #000; }
+  .hero-content { max-width: 720px; margin: 0 auto; }
+  .hero-label {
+    font-size: 0.7em; letter-spacing: 0.25em; text-transform: uppercase;
+    color: #999; margin-bottom: 32px;
+  }
+  .hero h1 {
+    font-size: clamp(2em, 5vw, 3.2em); font-weight: 400; color: #000;
+    line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 24px;
+  }
+  .hero h1 em { font-style: italic; }
+  .hero-sub { font-size: 0.9em; color: #666; line-height: 1.8; max-width: 520px; }
+  .hero-stats { display: flex; gap: 40px; margin-top: 48px; flex-wrap: wrap; }
+  .hero-stat { border-left: 1px solid #000; padding-left: 16px; }
+  .hero-stat .n { font-size: 2em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hero-stat .l {
+    font-size: 0.65em; color: #999; text-transform: uppercase;
+    letter-spacing: 0.15em; margin-top: 6px;
+  }
+
+  .section { padding: 64px 0; border-bottom: 1px solid #e0e0e0; }
+  .section:last-child { border-bottom: none; }
+  .section-number {
+    font-size: 0.65em; letter-spacing: 0.25em; text-transform: uppercase;
+    color: #999; margin-bottom: 12px;
+  }
+  .section h2 {
+    font-size: clamp(1.3em, 3vw, 1.8em); font-weight: 400;
+    letter-spacing: -0.01em; line-height: 1.3; margin-bottom: 10px;
+  }
+  .section-desc { font-size: 0.85em; color: #666; max-width: 560px; margin-bottom: 36px; }
+
+  .card { border: 1px solid #e0e0e0; padding: 28px; margin-bottom: 16px; }
+  .card-label {
+    font-size: 0.6em; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #999; margin-bottom: 20px;
+  }
+  .chart-container { position: relative; height: 380px; width: 100%; }
+  .chart-container.tall { height: 500px; }
+  .chart-container.short { height: 260px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  .dossier { border: 1px solid #000; padding: 32px; }
+  .dossier-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 768px) { .dossier-grid { grid-template-columns: 1fr; } }
+  .dossier-field { border-bottom: 1px solid #e0e0e0; padding: 10px 0; }
+  .dossier-field .label {
+    font-size: 0.6em; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #999; margin-bottom: 4px;
+  }
+  .dossier-field .value { font-size: 0.95em; color: #000; }
+
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .tag { border: 1px solid #000; padding: 4px 10px; font-size: 0.7em; letter-spacing: 0.05em; }
+
+  .insight {
+    border-left: 2px solid #000; padding: 16px 20px; margin: 24px 0;
+    font-size: 0.85em; line-height: 1.8; color: #333;
+  }
+
+  .data-list { columns: 2; column-gap: 32px; }
+  .data-list-item {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px solid #f0f0f0; break-inside: avoid;
+    font-size: 0.8em;
+  }
+  .data-list-item .name { color: #000; }
+  .data-list-item .ct {
+    font-variant-numeric: tabular-nums; color: #000; min-width: 32px; text-align: right;
+  }
+  @media (max-width: 768px) { .data-list { columns: 1; } }
+
+  .inv { background: #000; color: #fff; padding: 64px 0; }
+  .inv .section { border-bottom-color: #222; }
+  .inv .section-number { color: #666; }
+  .inv h2 { color: #fff; }
+  .inv .section-desc { color: #888; }
+  .inv .card { border-color: #222; background: transparent; }
+  .inv .card-label { color: #555; }
+  .inv .insight { border-left-color: #fff; color: #aaa; }
+  .inv .data-list-item { border-bottom-color: #222; }
+  .inv .data-list-item .name, .inv .data-list-item .ct { color: #ccc; }
+
+  .footer {
+    text-align: center; padding: 40px 24px; font-size: 0.7em;
+    color: #999; letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ TERMINAL ══════════ -->
+<div id="terminal" class="terminal">
+  <div class="term-line dim">instagram-surveillance-report v1.0 -- local, private, browser-based</div>
+  <div class="term-line dim">---------------------------------------------------------------</div>
+  <div class="term-line">&nbsp;</div>
+  <div class="term-line prompt">whoami</div>
+  <div class="term-line">This tool reads your Instagram data export and reveals the</div>
+  <div class="term-line">advertising profile built from your activity, the categories</div>
+  <div class="term-line">you've been assigned, and the companies tracking you off-app.</div>
+  <div class="term-line">&nbsp;</div>
+
+  <div class="term-line prompt">privacy</div>
+  <div class="term-line">Everything runs locally in your browser. No data is uploaded</div>
+  <div class="term-line">to any server. Your data never leaves your computer.</div>
+  <div class="term-line">&nbsp;</div>
+
+  <div class="term-line prompt">requirements</div>
+  <div class="term-line">1. Your Instagram data export in HTML format.</div>
+  <div class="term-line dim">   Settings > Your Activity > Download Your Information > HTML</div>
+  <div class="term-line">2. A Chromium browser (Chrome, Edge, Brave, Opera).</div>
+  <div class="term-line">&nbsp;</div>
+
+  <div id="unsupported" class="box warn" style="display:none;">
+    <div class="term-line bold">! Browser not supported</div>
+    <div class="term-line">This site requires the File System Access API.</div>
+    <div class="term-line">Please open it in Chrome, Edge, Brave, or Opera.</div>
+  </div>
+
+  <div id="supported" style="display:none;">
+    <div class="term-line prompt">ready</div>
+    <div class="term-line">Click below to grant access to your Instagram data folder.</div>
+    <div class="term-line dim">The browser will ask for permission. Only read access is requested.</div>
+    <div class="term-line">&nbsp;</div>
+    <button id="pickBtn" class="term-btn">[ select folder ]</button>
+    <div id="status" class="term-line"></div>
+  </div>
+</div>
+
+<!-- ══════════ REPORT ══════════ -->
+<div id="report"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// File System Access API support check
+// ══════════════════════════════════════════════════════════════════════
+const supported = 'showDirectoryPicker' in window;
+document.getElementById(supported ? 'supported' : 'unsupported').style.display = 'block';
+
+const statusEl = document.getElementById('status');
+function log(msg, cls='') {
+  const line = document.createElement('div');
+  line.className = 'term-line ' + cls;
+  line.textContent = msg;
+  statusEl.appendChild(line);
+}
+
+document.getElementById('pickBtn')?.addEventListener('click', async () => {
+  try {
+    const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    statusEl.innerHTML = '';
+    log('> granted access to: ' + dirHandle.name, 'dim');
+    log('> parsing data...');
+    await processFolder(dirHandle);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      log('> cancelled.', 'dim');
+    } else {
+      log('! error: ' + err.message, 'err');
+    }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// Folder traversal helpers
+// ══════════════════════════════════════════════════════════════════════
+async function getFile(root, path) {
+  const parts = path.split('/').filter(Boolean);
+  let handle = root;
+  try {
+    for (let i = 0; i < parts.length - 1; i++) {
+      handle = await handle.getDirectoryHandle(parts[i]);
+    }
+    const fileHandle = await handle.getFileHandle(parts[parts.length - 1]);
+    const file = await fileHandle.getFile();
+    return await file.text();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getSubdir(root, path) {
+  const parts = path.split('/').filter(Boolean);
+  let handle = root;
+  try {
+    for (const p of parts) {
+      handle = await handle.getDirectoryHandle(p);
+    }
+    return handle;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HTML parsing helpers (DOMParser-based)
+// ══════════════════════════════════════════════════════════════════════
+function parseHTML(text) {
+  return new DOMParser().parseFromString(text, 'text/html');
+}
+
+function textsFromClass(doc, cls) {
+  // returns text of every innermost element matching .cls (single class, leaf-only)
+  const sel = '.' + cls;
+  const nodes = doc.querySelectorAll(sel);
+  const out = [];
+  nodes.forEach(n => {
+    if (n.querySelector(sel)) return;
+    const t = (n.textContent || '').trim();
+    if (t) out.push(t);
+  });
+  return out;
+}
+
+function textsFromClasses(doc, classes) {
+  // returns innermost text from any element matching any of the given classes,
+  // in document order. "Innermost" means no descendant with the SAME class.
+  const selAll = classes.map(c => '.' + c).join(', ');
+  const nodes = Array.from(doc.querySelectorAll(selAll));
+  const out = [];
+  nodes.forEach(n => {
+    // identify which class matched to enforce "no same-class descendant"
+    let matchedCls = null;
+    for (const c of classes) {
+      if (n.classList.contains(c)) { matchedCls = c; break; }
+    }
+    if (matchedCls && n.querySelector('.' + matchedCls)) return;
+    const t = (n.textContent || '').trim();
+    if (t) out.push(t);
+  });
+  return out;
+}
+
+// ── ad_preferences: Event / Ad title / Creation time triples
+function parseAdPreferences(text) {
+  if (!text) return [];
+  const doc = parseHTML(text);
+  const texts = textsFromClasses(doc, ['_a6-p', '_a6_q', '_a6_r']);
+  const out = [];
+  let i = 0;
+  while (i < texts.length) {
+    if (texts[i] === 'Event' && i + 1 < texts.length) {
+      const entry = { event: texts[i + 1] };
+      i += 2;
+      if (texts[i] === 'Ad title' && i + 1 < texts.length) {
+        entry.ad_title = texts[i + 1]; i += 2;
+      }
+      if (texts[i] === 'Creation time' && i + 1 < texts.length) {
+        entry.creation_time = texts[i + 1]; i += 2;
+      }
+      out.push(entry);
+    } else i++;
+  }
+  return out;
+}
+
+// ── ads_viewed / posts_viewed / videos_watched: Name / Username pairs
+function parseNamedList(text) {
+  if (!text) return [];
+  const doc = parseHTML(text);
+  const texts = textsFromClasses(doc, ['_a6-p', '_a6_q', '_a6_r']);
+  const skip = new Set(['URL','Username','Ad library public URL','Owner','Name']);
+  const out = [];
+  let current = null;
+  for (let i = 0; i < texts.length; i++) {
+    const t = texts[i], nxt = texts[i + 1];
+    if (t === 'Name' && nxt && !skip.has(nxt)) {
+      if (current && current.name) out.push(current);
+      current = { name: nxt };
+    } else if (t === 'Username' && nxt && !skip.has(nxt) && current) {
+      current.username = nxt;
+    }
+  }
+  if (current && current.name) out.push(current);
+  return out;
+}
+
+// ── other_categories
+function parseCategories(text) {
+  if (!text) return [];
+  const doc = parseHTML(text);
+  return textsFromClass(doc, '_a6-p').filter(t => t !== 'Name');
+}
+
+// ── table (submitted info, subscription): ._a6_q label + ._a6_r value
+function parseTable(text) {
+  if (!text) return {};
+  const doc = parseHTML(text);
+  const out = {};
+  doc.querySelectorAll('td._a6_q').forEach(td => {
+    let label = '';
+    for (const c of td.childNodes) if (c.nodeType === Node.TEXT_NODE) label += c.textContent;
+    label = label.trim();
+    let next = td.nextElementSibling;
+    while (next && !(next.tagName === 'TD' && next.className.includes('_a6_r'))) next = next.nextElementSibling;
+    if (next) {
+      let val = '';
+      for (const c of next.childNodes) if (c.nodeType === Node.TEXT_NODE) val += c.textContent;
+      out[label] = val.trim();
+    }
+  });
+  return out;
+}
+
+// ── off-meta index: strong > a
+function parseOffMetaIndex(text) {
+  if (!text) return [];
+  const doc = parseHTML(text);
+  const out = [];
+  doc.querySelectorAll('strong a').forEach(a => {
+    const t = a.textContent.trim();
+    if (t) out.push(t);
+  });
+  return out;
+}
+
+// ── off-meta detail: Event / Received on pairs
+function parseOffMetaDetail(text) {
+  if (!text) return [];
+  const doc = parseHTML(text);
+  const texts = textsFromClasses(doc, ['_a6-p', '_a6_q', '_a6_r']);
+  const out = [];
+  let current = null;
+  for (let i = 0; i < texts.length; i++) {
+    if (texts[i] === 'Event' && i + 1 < texts.length) {
+      if (current) out.push(current);
+      current = { event: texts[i + 1] };
+    } else if (texts[i] === 'Received on' && i + 1 < texts.length && current) {
+      current.date = texts[i + 1];
+    }
+  }
+  if (current) out.push(current);
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Date + aggregation helpers
+// ══════════════════════════════════════════════════════════════════════
+const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+function parseDate(s) {
+  // "Apr 06, 2026 2:43 am"
+  if (!s) return null;
+  const m = s.match(/^(\w{3})\s+(\d{1,2}),\s+(\d{4})/);
+  if (!m) return null;
+  return new Date(+m[3], MONTHS[m[1]] ?? 0, +m[2]);
+}
+function monthlyTimeline(entries, key='creation_time') {
+  const months = {};
+  for (const e of entries) {
+    const d = parseDate(e[key]);
+    if (d) {
+      const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      months[k] = (months[k]||0) + 1;
+    }
+  }
+  return Object.fromEntries(Object.entries(months).sort());
+}
+function countNames(items, key='name') {
+  const c = {};
+  for (const i of items) c[i[key]||'Unknown'] = (c[i[key]||'Unknown']||0) + 1;
+  return Object.fromEntries(Object.entries(c).sort((a,b)=>b[1]-a[1]));
+}
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+// ══════════════════════════════════════════════════════════════════════
+// Main processing
+// ══════════════════════════════════════════════════════════════════════
+async function processFolder(root) {
+  // Verify shape
+  const adsRoot = await getSubdir(root, 'ads_information');
+  if (!adsRoot) {
+    log('! this doesn\'t look like an Instagram export (no ads_information folder found)', 'err');
+    return;
+  }
+
+  log('  > ads_information/ ... found', 'dim');
+
+  const adPrefs = parseAdPreferences(
+    await getFile(root, 'ads_information/instagram_ads_and_businesses/ad_preferences.html')
+  );
+  log('  > hidden/reported ads: ' + adPrefs.length, 'dim');
+
+  const adsViewed = parseNamedList(
+    await getFile(root, 'ads_information/ads_and_topics/ads_viewed.html')
+  );
+  log('  > ads viewed: ' + adsViewed.length, 'dim');
+
+  const categories = parseCategories(
+    await getFile(root, 'ads_information/instagram_ads_and_businesses/other_categories_used_to_reach_you.html')
+  );
+  log('  > ad categories: ' + categories.length, 'dim');
+
+  const submitted = parseTable(
+    await getFile(root, "ads_information/instagram_ads_and_businesses/information_you've_submitted_to_advertisers.html")
+  );
+  log('  > submitted info fields: ' + Object.keys(submitted).length, 'dim');
+
+  const subscription = parseTable(
+    await getFile(root, 'ads_information/instagram_ads_and_businesses/subscription_for_no_ads.html')
+  );
+  log('  > subscription status: ' + (subscription['Your subscription status']||'unknown'), 'dim');
+
+  const offMetaBiz = parseOffMetaIndex(
+    await getFile(root, 'apps_and_websites_off_of_instagram/apps_and_websites/your_activity_off_meta_technologies.html')
+  );
+  log('  > off-meta businesses: ' + offMetaBiz.length, 'dim');
+
+  const offMetaEvents = {};
+  for (let i = 0; i < offMetaBiz.length; i++) {
+    const events = parseOffMetaDetail(
+      await getFile(root, `apps_and_websites_off_of_instagram/apps_and_websites/your_activity_off_meta_technologies/${i}.html`)
+    );
+    if (events.length) offMetaEvents[offMetaBiz[i]] = events;
+  }
+  const totalOffEvents = Object.values(offMetaEvents).reduce((a,v)=>a+v.length, 0);
+  log('  > off-meta events: ' + totalOffEvents, 'dim');
+
+  const postsViewed = parseNamedList(
+    await getFile(root, 'ads_information/ads_and_topics/posts_viewed.html')
+  );
+  log('  > posts viewed: ' + postsViewed.length, 'dim');
+
+  const videosWatched = parseNamedList(
+    await getFile(root, 'ads_information/ads_and_topics/videos_watched.html')
+  );
+  log('  > videos watched: ' + videosWatched.length, 'dim');
+
+  log(' ');
+  log('> generating report...', 'bold');
+  renderReport({ adPrefs, adsViewed, categories, submitted, subscription, offMetaBiz, offMetaEvents, postsViewed, videosWatched });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Report rendering
+// ══════════════════════════════════════════════════════════════════════
+function renderReport(d) {
+  const topAdvertisers = countNames(d.adsViewed);
+  const top20Ads = Object.fromEntries(Object.entries(topAdvertisers).slice(0, 20));
+  const top20Posts = Object.fromEntries(Object.entries(countNames(d.postsViewed)).slice(0, 20));
+  const top20Videos = Object.fromEntries(Object.entries(countNames(d.videosWatched)).slice(0, 20));
+  const hiddenAdsTimeline = monthlyTimeline(d.adPrefs);
+
+  const hiddenEventTypes = {};
+  for (const e of d.adPrefs) hiddenEventTypes[e.event||'Unknown'] = (hiddenEventTypes[e.event||'Unknown']||0) + 1;
+
+  const offMetaEventTypes = {};
+  for (const evs of Object.values(d.offMetaEvents))
+    for (const e of evs) offMetaEventTypes[e.event||'UNKNOWN'] = (offMetaEventTypes[e.event||'UNKNOWN']||0) + 1;
+  const offMetaEventTypesSorted = Object.fromEntries(Object.entries(offMetaEventTypes).sort((a,b)=>b[1]-a[1]));
+
+  const offMetaByBiz = Object.fromEntries(
+    Object.entries(d.offMetaEvents).map(([k,v])=>[k,v.length]).sort((a,b)=>b[1]-a[1])
+  );
+
+  const allOffMeta = [];
+  for (const evs of Object.values(d.offMetaEvents))
+    for (const e of evs) if (e.date) allOffMeta.push({ creation_time: e.date });
+  const offMetaTimeline = monthlyTimeline(allOffMeta);
+
+  const totalContent = d.postsViewed.length + d.videosWatched.length + d.adsViewed.length;
+  const adsPct = totalContent ? ((d.adsViewed.length / totalContent) * 100).toFixed(1) : 0;
+  const top5Vals = Object.values(topAdvertisers).slice(0, 5);
+  const top5Sum = top5Vals.reduce((a,b)=>a+b, 0);
+  const top5Pct = d.adsViewed.length ? ((top5Sum / d.adsViewed.length) * 100).toFixed(1) : 0;
+
+  const topAdvKey = Object.keys(topAdvertisers)[0] || 'Unknown';
+  const topAdvVal = Object.values(topAdvertisers)[0] || 0;
+  const topOffMetaBiz = Object.keys(offMetaByBiz)[0] || 'a website';
+  const totalOffEvents = Object.values(d.offMetaEvents).reduce((a,v)=>a+v.length, 0);
+
+  const submittedRows = Object.keys(d.submitted).length
+    ? Object.entries(d.submitted).map(([k,v])=>`<div class="dossier-field"><div class="label">${esc(k)}</div><div class="value">${esc(v)}</div></div>`).join('')
+    : '<div class="dossier-field"><div class="label">Submitted data</div><div class="value" style="color:#999">None collected</div></div>';
+  const subscriptionRows = Object.entries(d.subscription).map(([k,v])=>`<div class="dossier-field"><div class="label">${esc(k)}</div><div class="value">${esc(v)}</div></div>`).join('');
+  const categoryTags = d.categories.length
+    ? d.categories.map(c=>`<span class="tag">${esc(c)}</span>`).join('')
+    : '<span style="color:#999">None</span>';
+  const allAdvList = Object.entries(topAdvertisers).slice(0, 80).map(([n,c])=>`<div class="data-list-item"><span class="name">${esc(n)}</span><span class="ct">${c}</span></div>`).join('');
+
+  const html = `
+<div class="hero">
+  <div class="hero-content">
+    <div class="hero-label">Instagram Surveillance Report</div>
+    <h1>What Instagram <em>knows</em> about you</h1>
+    <p class="hero-sub">This report reveals the advertising profile Instagram has built from your activity, the categories they've assigned you, and the companies tracking you beyond the app.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="n">${d.adsViewed.length}</div><div class="l">Ads served</div></div>
+      <div class="hero-stat"><div class="n">${Object.keys(topAdvertisers).length}</div><div class="l">Advertisers</div></div>
+      <div class="hero-stat"><div class="n">${d.offMetaBiz.length}</div><div class="l">Off-app trackers</div></div>
+      <div class="hero-stat"><div class="n">${totalContent.toLocaleString()}</div><div class="l">Content logged</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<div class="section">
+  <div class="section-number">01 -- Your profile</div>
+  <h2>The identity Instagram built for you</h2>
+  <p class="section-desc">This is the advertising profile Instagram constructed from your behaviour, device data, and information you've directly submitted. Advertisers use these fields to target you.</p>
+  <div class="dossier">
+    <div class="dossier-grid">
+      <div>
+        ${submittedRows}
+        ${subscriptionRows}
+        <div class="dossier-field"><div class="label">Total advertisers with access</div><div class="value">${Object.keys(topAdvertisers).length}</div></div>
+        <div class="dossier-field"><div class="label">Off-platform trackers</div><div class="value">${d.offMetaBiz.length} companies</div></div>
+      </div>
+      <div>
+        <div class="dossier-field"><div class="label">Behavioural categories assigned</div><div class="tag-row">${categoryTags}</div></div>
+        <div class="dossier-field"><div class="label">Content in your feed that was ads</div><div class="value">${adsPct}% of all content served</div></div>
+        <div class="dossier-field"><div class="label">Advertiser concentration</div><div class="value">Top 5 advertisers = ${top5Pct}% of your ads</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="insight">Instagram categorises you based on your <strong>device type</strong>, <strong>network behaviour</strong>, and <strong>browsing patterns</strong> -- not just what you follow. These categories are sold to advertisers as targeting options without your explicit consent for each one.</div>
+</div>
+
+<div class="section">
+  <div class="section-number">02 -- Who pays to reach you</div>
+  <h2>${Object.keys(topAdvertisers).length} advertisers bought access to your attention</h2>
+  <p class="section-desc">Each bar represents a company that paid Instagram to place content in your feed.</p>
+  <div class="card"><div class="card-label">Top 20 advertisers by frequency</div><div class="chart-container tall"><canvas id="topAdvertisersChart"></canvas></div></div>
+  <div class="insight"><strong>${esc(topAdvKey)}</strong> appeared in your feed <strong>${topAdvVal} times</strong>. The top 5 advertisers alone account for ${top5Pct}% of all ads you were shown.</div>
+  <div class="card"><div class="card-label">All ${Object.keys(topAdvertisers).length} advertisers</div><div class="data-list">${allAdvList}</div></div>
+</div>
+
+<div class="section">
+  <div class="section-number">03 -- Your resistance</div>
+  <h2>You hid or reported ${d.adPrefs.length} ads</h2>
+  <p class="section-desc">Every time you hide or report an ad, Instagram logs it.</p>
+  <div class="grid-2">
+    <div class="card"><div class="card-label">Actions over time</div><div class="chart-container"><canvas id="hiddenAdsTimeline"></canvas></div></div>
+    <div class="card"><div class="card-label">Type of action</div><div class="chart-container"><canvas id="hiddenTypesChart"></canvas></div></div>
+  </div>
+  <div class="insight">Even when you reject an ad, the act of rejection becomes data. Instagram uses your <strong>hide</strong> and <strong>report</strong> signals to refine its model of what you'll tolerate -- optimising not for your comfort, but for the threshold just below your resistance.</div>
+</div>
+</div>
+
+<div class="inv">
+<div class="container">
+<div class="section" style="border:none;">
+  <div class="section-number">04 -- Surveillance beyond the app</div>
+  <h2>${d.offMetaBiz.length} companies shared your activity with Instagram</h2>
+  <p class="section-desc">These businesses sent data about your behaviour on their websites and apps back to Meta. You were tracked across ${totalOffEvents} interactions outside of Instagram.</p>
+  <div class="grid-2">
+    <div class="card"><div class="card-label">Data shared per company</div><div class="chart-container"><canvas id="offMetaBizChart"></canvas></div></div>
+    <div class="card"><div class="card-label">What they tracked</div><div class="chart-container"><canvas id="offMetaTypesChart"></canvas></div></div>
+  </div>
+  <div class="card"><div class="card-label">When they tracked you</div><div class="chart-container short"><canvas id="offMetaTimeline"></canvas></div></div>
+  <div class="insight">Meta's tracking pixel is embedded on millions of websites. When you visit <strong>${esc(topOffMetaBiz)}</strong>, search for a product, or view a page, that activity is sent to Instagram and linked to your profile -- even when you're not logged in.</div>
+</div>
+</div>
+</div>
+
+<div class="container">
+<div class="section">
+  <div class="section-number">05 -- Your behavioural fingerprint</div>
+  <h2>Instagram logged ${totalContent.toLocaleString()} pieces of content you consumed</h2>
+  <p class="section-desc">Every post you pause on, every video you watch -- it's recorded.</p>
+  <div class="grid-3">
+    <div class="card" style="text-align:center;padding:24px 16px;"><div style="font-size:2em;">${d.postsViewed.length.toLocaleString()}</div><div style="font-size:0.6em;color:#999;text-transform:uppercase;letter-spacing:0.2em;margin-top:4px;">Posts tracked</div></div>
+    <div class="card" style="text-align:center;padding:24px 16px;"><div style="font-size:2em;">${d.videosWatched.length.toLocaleString()}</div><div style="font-size:0.6em;color:#999;text-transform:uppercase;letter-spacing:0.2em;margin-top:4px;">Videos tracked</div></div>
+    <div class="card" style="text-align:center;padding:24px 16px;"><div style="font-size:2em;">${d.adsViewed.length.toLocaleString()}</div><div style="font-size:0.6em;color:#999;text-transform:uppercase;letter-spacing:0.2em;margin-top:4px;">Ads tracked</div></div>
+  </div>
+  <div class="card"><div class="card-label">Accounts you viewed most (posts)</div><div class="chart-container tall"><canvas id="topPostsChart"></canvas></div></div>
+  <div class="card"><div class="card-label">Accounts you watched most (video)</div><div class="chart-container tall"><canvas id="topVideosChart"></canvas></div></div>
+  <div class="insight">This data forms a <strong>behavioural fingerprint</strong> unique to you. Instagram uses it to predict what content will keep you on the platform longer, and which ads you're most likely to act on. Your attention is the product being optimised.</div>
+</div>
+</div>
+
+<div class="footer">Generated locally in your browser. No data was uploaded anywhere.</div>
+`;
+
+  document.getElementById('terminal').style.display = 'none';
+  const reportEl = document.getElementById('report');
+  reportEl.innerHTML = html;
+  reportEl.classList.add('visible');
+
+  // Charts
+  Chart.defaults.font.family = "'SF Mono', 'Consolas', 'Monaco', monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#999';
+  Chart.defaults.borderColor = '#e0e0e0';
+
+  const BK = '#000', GY = '#999';
+  const LG = { color: '#f0f0f0' }, NG = { display: false };
+  function bw(n) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / Math.max(n - 1, 1);
+      const v = Math.round(t * 180);
+      out.push(`rgb(${v},${v},${v})`);
+    }
+    return out;
+  }
+
+  function barOpts(dark=false) {
+    return {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: dark ? { color: '#222' } : LG, ticks: { color: dark ? '#666' : GY } },
+        y: { grid: NG, ticks: { color: dark ? '#aaa' : BK } }
+      }
+    };
+  }
+
+  new Chart(document.getElementById('topAdvertisersChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(top20Ads), datasets: [{ data: Object.values(top20Ads), backgroundColor: bw(Object.keys(top20Ads).length), borderRadius: 2 }] },
+    options: barOpts()
+  });
+
+  new Chart(document.getElementById('hiddenAdsTimeline'), {
+    type: 'bar',
+    data: { labels: Object.keys(hiddenAdsTimeline), datasets: [{ data: Object.values(hiddenAdsTimeline), backgroundColor: BK, borderRadius: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: LG, ticks: { color: GY } }, x: { grid: NG, ticks: { color: GY, maxRotation: 45 } } } }
+  });
+
+  new Chart(document.getElementById('hiddenTypesChart'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(hiddenEventTypes), datasets: [{ data: Object.values(hiddenEventTypes), backgroundColor: ['#000','#666','#999','#bbb','#ddd'], borderWidth: 0, spacing: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded' } } } }
+  });
+
+  new Chart(document.getElementById('offMetaBizChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(offMetaByBiz), datasets: [{ data: Object.values(offMetaByBiz), backgroundColor: '#fff', borderRadius: 2 }] },
+    options: barOpts(true)
+  });
+
+  new Chart(document.getElementById('offMetaTypesChart'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(offMetaEventTypesSorted), datasets: [{ data: Object.values(offMetaEventTypesSorted), backgroundColor: ['#fff','#aaa','#666','#444','#333','#222'], borderWidth: 0, spacing: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { position: 'bottom', labels: { padding: 16, color: '#888', usePointStyle: true, pointStyle: 'rectRounded' } } } }
+  });
+
+  new Chart(document.getElementById('offMetaTimeline'), {
+    type: 'line',
+    data: { labels: Object.keys(offMetaTimeline), datasets: [{ data: Object.values(offMetaTimeline), borderColor: '#fff', backgroundColor: 'rgba(255,255,255,0.05)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#666' } }, x: { grid: NG, ticks: { color: '#666', maxRotation: 45 } } } }
+  });
+
+  new Chart(document.getElementById('topPostsChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(top20Posts), datasets: [{ data: Object.values(top20Posts), backgroundColor: bw(Object.keys(top20Posts).length), borderRadius: 2 }] },
+    options: barOpts()
+  });
+
+  new Chart(document.getElementById('topVideosChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(top20Videos), datasets: [{ data: Object.values(top20Videos), backgroundColor: bw(Object.keys(top20Videos).length), borderRadius: 2 }] },
+    options: barOpts()
+  });
+}
+</script>
+</body>
+</html>

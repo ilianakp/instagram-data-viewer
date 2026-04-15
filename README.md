@@ -1,47 +1,30 @@
-# Instagram Ads & Business Data Viewer
+# Instagram Surveillance Report
 
-A standalone Windows executable that parses your Instagram data export and generates an interactive HTML dashboard visualizing how Instagram tracks and targets you with ads.
+A local, browser-based tool that parses your Instagram data export and reveals the advertising profile Instagram built from your activity -- the categories they assigned you and the companies tracking you beyond the app.
+
+**Everything runs in your browser. No data is uploaded anywhere.**
+
+## Use it
+
+Open `index.html` in a Chromium browser (Chrome, Edge, Brave, Opera), click **[ select folder ]**, and point it at your Instagram data export folder.
+
+Or visit the live site: https://ilianakp.github.io/instagram-data-viewer/
 
 ## What it shows
 
-- **Summary stats** -- total ads viewed, unique advertisers, hidden ads, off-meta trackers
-- **Your ad profile** -- info you've submitted to advertisers, subscription status, targeting categories
-- **Top advertisers** -- who shows you the most ads (bar chart)
-- **Hidden ads timeline** -- when you've hidden/reported ads over time
-- **Content viewed** -- top accounts by posts and videos viewed
-- **Off-Meta activity** -- which businesses share your activity with Instagram, event types, timeline
-
-## Usage
-
-### Option 1: Drag and drop
-Drag your Instagram data export folder onto `InstaDataViewer.exe`.
-
-### Option 2: Double-click
-Double-click `InstaDataViewer.exe` and paste the path to your data folder when prompted.
-
-### Option 3: Command line
-```
-InstaDataViewer.exe "C:\path\to\instagram-data-export"
-```
-
-The report opens automatically in your default browser.
+- **Your profile** -- info you've submitted to advertisers, targeting categories, advertiser concentration
+- **Who pays to reach you** -- every company that bought ad space in your feed
+- **Your resistance** -- timeline of ads you hid or reported
+- **Surveillance beyond the app** -- off-Meta businesses that shared your activity back to Instagram
+- **Your behavioural fingerprint** -- accounts you viewed and videos you watched most
 
 ## Getting your Instagram data
 
-1. Go to Instagram Settings > Your Activity > Download Your Information
+1. Instagram Settings > Your Activity > Download Your Information
 2. Select **HTML** format
-3. Download and extract the archive
-4. Point this tool at the extracted folder
+3. Download and unzip the archive
+4. Point this tool at the unzipped folder
 
-## Building from source
+## Browser requirement
 
-Only needed if you want to modify the code. End users just run the exe.
-
-Requires Python 3.9+.
-
-```bash
-pip install pyinstaller
-python -m PyInstaller --onefile --console --name InstaDataViewer --add-data "chartjs.min.js;." instagram_ads_viewer.py
-```
-
-The exe will be in `dist/InstaDataViewer.exe`.
+Uses the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API) to read your folder locally. Currently Chromium-only (Firefox/Safari don't support it yet).
