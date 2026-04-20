@@ -227,6 +227,77 @@ function log(msg, cls='') {
   statusEl.appendChild(line);
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Diagnostics — collected so a user who gets no results can share a report
+// ══════════════════════════════════════════════════════════════════════
+const diagnostics = {
+  version: '1.0',
+  timestamp: new Date().toISOString(),
+  userAgent: navigator.userAgent,
+  rootName: '',
+  topLevelEntries: [],
+  files: [],
+  summary: {},
+  errors: []
+};
+
+function sniffClasses(text) {
+  if (!text) return null;
+  const counts = {};
+  const re = /class="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(text))) {
+    for (const c of m[1].split(/\s+/)) {
+      if (c && c.startsWith('_a')) counts[c] = (counts[c] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+async function listTopLevel(root) {
+  const names = [];
+  try {
+    for await (const [name, handle] of root.entries()) {
+      names.push(handle.kind === 'directory' ? name + '/' : name);
+      if (names.length >= 200) break;
+    }
+    names.sort();
+  } catch (e) {
+    names.push('(error listing: ' + e.name + ': ' + e.message + ')');
+  }
+  return names;
+}
+
+function renderDiagnosticsPanel(container, reason) {
+  const report = JSON.stringify(diagnostics, null, 2);
+  const panel = document.createElement('div');
+  panel.className = 'box warn';
+  panel.style.marginTop = '24px';
+  panel.innerHTML = `
+    <div class="term-line bold">! ${reason}</div>
+    <div class="term-line">Something looks off with the parse. Click below to copy a diagnostic report you can paste into a message.</div>
+    <div class="term-line dim">Contents: folder structure, file sizes, HTML class counts. No personal data from inside the files.</div>
+    <div class="term-line">&nbsp;</div>
+    <textarea readonly style="width:100%;height:240px;font-family:inherit;font-size:0.8em;padding:12px;border:1px solid #000;background:#fff;color:#000;resize:vertical;white-space:pre;"></textarea>
+    <div class="term-line">&nbsp;</div>
+    <button class="term-btn copy-diag">[ copy diagnostic report ]</button>
+  `;
+  const ta = panel.querySelector('textarea');
+  ta.value = report;
+  const btn = panel.querySelector('.copy-diag');
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(ta.value);
+    } catch {
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+    }
+    btn.textContent = '[ copied ]';
+    setTimeout(() => { btn.textContent = '[ copy diagnostic report ]'; }, 2000);
+  });
+  container.appendChild(panel);
+}
+
 document.getElementById('pickBtn')?.addEventListener('click', async () => {
   try {
     const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
@@ -239,6 +310,8 @@ document.getElementById('pickBtn')?.addEventListener('click', async () => {
       log('> cancelled.', 'dim');
     } else {
       log('! error: ' + err.message, 'err');
+      diagnostics.errors.push({ where: 'pickBtn', name: err.name, message: err.message, stack: err.stack });
+      renderDiagnosticsPanel(statusEl, 'An unexpected error occurred.');
     }
   }
 });
@@ -248,6 +321,7 @@ document.getElementById('pickBtn')?.addEventListener('click', async () => {
 // ══════════════════════════════════════════════════════════════════════
 async function getFile(root, path) {
   const parts = path.split('/').filter(Boolean);
+  const diag = { path };
   let handle = root;
   try {
     for (let i = 0; i < parts.length - 1; i++) {
@@ -255,8 +329,16 @@ async function getFile(root, path) {
     }
     const fileHandle = await handle.getFileHandle(parts[parts.length - 1]);
     const file = await fileHandle.getFile();
-    return await file.text();
+    const text = await file.text();
+    diag.found = true;
+    diag.size = file.size;
+    diag.classes = sniffClasses(text);
+    diagnostics.files.push(diag);
+    return text;
   } catch (e) {
+    diag.found = false;
+    diag.error = e.name + ': ' + e.message;
+    diagnostics.files.push(diag);
     return null;
   }
 }
@@ -270,6 +352,7 @@ async function getSubdir(root, path) {
     }
     return handle;
   } catch (e) {
+    diagnostics.errors.push({ where: 'getSubdir', path, name: e.name, message: e.message });
     return null;
   }
 }
@@ -448,10 +531,15 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>
 // Main processing
 // ══════════════════════════════════════════════════════════════════════
 async function processFolder(root) {
+  diagnostics.rootName = root.name;
+  diagnostics.topLevelEntries = await listTopLevel(root);
+
   // Verify shape
   const adsRoot = await getSubdir(root, 'ads_information');
   if (!adsRoot) {
     log('! this doesn\'t look like an Instagram export (no ads_information folder found)', 'err');
+    log('  > top-level of selected folder: ' + (diagnostics.topLevelEntries.slice(0, 10).join(', ') || '(empty)'), 'dim');
+    renderDiagnosticsPanel(statusEl, 'No ads_information folder in the selected folder.');
     return;
   }
 
@@ -507,9 +595,37 @@ async function processFolder(root) {
   );
   log('  > videos watched: ' + videosWatched.length, 'dim');
 
+  diagnostics.summary = {
+    adPrefs: adPrefs.length,
+    adsViewed: adsViewed.length,
+    categories: categories.length,
+    submittedFields: Object.keys(submitted).length,
+    subscriptionFields: Object.keys(subscription).length,
+    offMetaBiz: offMetaBiz.length,
+    offMetaEvents: totalOffEvents,
+    postsViewed: postsViewed.length,
+    videosWatched: videosWatched.length
+  };
+
+  const totalParsed = adPrefs.length + adsViewed.length + categories.length
+    + offMetaBiz.length + postsViewed.length + videosWatched.length;
+
+  if (totalParsed === 0) {
+    log(' ');
+    log('! nothing could be parsed from the selected folder.', 'err');
+    renderDiagnosticsPanel(statusEl, 'All parsers returned zero results.');
+    return;
+  }
+
   log(' ');
   log('> generating report...', 'bold');
-  renderReport({ adPrefs, adsViewed, categories, submitted, subscription, offMetaBiz, offMetaEvents, postsViewed, videosWatched });
+  try {
+    renderReport({ adPrefs, adsViewed, categories, submitted, subscription, offMetaBiz, offMetaEvents, postsViewed, videosWatched });
+  } catch (err) {
+    diagnostics.errors.push({ where: 'renderReport', name: err.name, message: err.message, stack: err.stack });
+    log('! render error: ' + err.message, 'err');
+    renderDiagnosticsPanel(statusEl, 'The report failed to render.');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════
